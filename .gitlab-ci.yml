@@ -1,0 +1,33 @@
+stages:
+  - test
+  - build
+
+variables:
+  IMAGE_TAG: $CI_REGISTRY_IMAGE/$CI_PROJECT_NAME/mywebapp:$CI_COMMIT_SHORT_SHA
+
+pytest:
+    image: python:latest
+    stage: test
+    before_script:
+        - pip  install pytest-html
+        - pip install --upgrade pip
+        - pip install werkzeug==2.0.3
+        - pip install -r requirements.txt
+    script:
+        - pytest --html=pytest_reports/myreport.html
+    artifacts:
+        when: always
+        paths:
+            - pytest_reports/
+
+build:
+    stage: build
+    image: docker:latest
+    services:
+      - docker:dind
+    before_script:
+      - docker login $CI_REGISTRY  -u $CI_REGISTRY_USER  -p $CI_REGISTRY_PASSWORD
+    script:
+      - docker build -t $IMAGE_TAG  .
+      - docker images
+      - docker push $IMAGE_TAG
