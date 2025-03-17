@@ -85,8 +85,8 @@ deploy_app_to_prod_env:
     - docker login -u _  -p  $HEROKU_STAGING_API_KEY  registry.heroku.com
   script:
     - docker pull $IMAGE_TAG
-    - docker tag  $IMAGE_TAG $HEROKU_STAGING_IMAGE_TAG
-    - docker push $HEROKU_STAGING_IMAGE_TAG
-    - docker run --rm -e HEROKU_API_KEY=$HEROKU_STAGING_API_KEY wingrunr21/alpine-heroku-cli container:release web --app $STAGING_APP
+    - docker tag  $IMAGE_TAG $HEROKU_PROD_IMAGE_TAG
+    - docker push $HEROKU_PROD_IMAGE_TAG
+    - docker run --rm -e HEROKU_API_KEY=$HEROKU_STAGING_API_KEY wingrunr21/alpine-heroku-cli container:release web --app $PROD_APP
   only:
     - main
