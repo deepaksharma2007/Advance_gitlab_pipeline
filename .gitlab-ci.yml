@@ -1,11 +1,21 @@
 stages:
   - test
   - build
+  - deploy staging
+  - automated testing
+  - deploy prod
 
 variables:
   IMAGE_TAG: $CI_REGISTRY_IMAGE/$CI_PROJECT_NAME/mywebapp:$CI_COMMIT_SHORT_SHA
+  #IMAGE_TAG: $CI_REGISTRY_IMAGE/$CI_PROJECT_NAME/mywebapp:v1  if we get error in prod pipeline 
+  PROD_APP_URL: https://prod-pyapp-ecaadf17ec34.herokuapp.com/
+  TEST_APP_URL: https://deepak-pyapp-10de8c7b492b.herokuapp.com/
+  STAGING_APP: "deepak-pyapp"
+  PROD_APP: "prod-pyapp"
+  HEROKU_STAGING_IMAGE_TAG: "registry.heroku.com/deepak-pyapp/web"
+  HEROKU_PROD_IMAGE_TAG: "registry.heroku.com/prod-pyapp/web"
 
-pytest:
+Unit testing:
     image: python:latest
     stage: test
     before_script:
@@ -19,6 +29,8 @@ pytest:
         when: always
         paths:
             - pytest_reports/
+    only:
+      - devb
 
 build:
     stage: build
@@ -31,3 +43,50 @@ build:
       - docker build -t $IMAGE_TAG  .
       - docker images
       - docker push $IMAGE_TAG
+    only:
+      - devb
+ 
+deploy_app_to_test_env:
+  stage: deploy staging
+  image: docker:latest
+  services:
+    - docker:dind
+  before_script:
+    # Login to gitlab registry and pull image and rename and then login to Heroku and push to Heroku
+    - docker login $CI_REGISTRY  -u $CI_REGISTRY_USER  -p $CI_REGISTRY_PASSWORD
+    - docker login -u _  -p  $HEROKU_STAGING_API_KEY  registry.heroku.com
+  script:
+    - docker pull $IMAGE_TAG
+    - docker tag  $IMAGE_TAG $HEROKU_STAGING_IMAGE_TAG
+    - docker push $HEROKU_STAGING_IMAGE_TAG
+    - docker run --rm -e HEROKU_API_KEY=$HEROKU_STAGING_API_KEY wingrunr21/alpine-heroku-cli container:release web --app $STAGING_APP
+  only:
+    - devb 
+
+test_stage:
+  image: alpine
+  stage: automated testing
+  before_script:
+  # For automated testing :- install curl command & don't use caches to check
+   - apk --no-cache add curl
+  script:
+   - curl $TEST_APP_URL | grep -i "Employee"
+  only:
+   - devb
+
+deploy_app_to_prod_env:
+  stage: deploy prod
+  image: docker:latest
+  services:
+    - docker:dind
+  before_script:
+    # Login to gitlab registry and pull image and rename and then login to Heroku and push to Heroku
+    - docker login $CI_REGISTRY  -u $CI_REGISTRY_USER  -p $CI_REGISTRY_PASSWORD
+    - docker login -u _  -p  $HEROKU_STAGING_API_KEY  registry.heroku.com
+  script:
+    - docker pull $IMAGE_TAG
+    - docker tag  $IMAGE_TAG $HEROKU_STAGING_IMAGE_TAG
+    - docker push $HEROKU_STAGING_IMAGE_TAG
+    - docker run --rm -e HEROKU_API_KEY=$HEROKU_STAGING_API_KEY wingrunr21/alpine-heroku-cli container:release web --app $STAGING_APP
+  only:
+    - main
